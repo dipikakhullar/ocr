@@ -6,6 +6,8 @@ Created on Aug 25, 2017
 
 import cv2
 import numpy as np
+import os
+import warnings
 
 from nms import get_boxes
 
@@ -21,6 +23,7 @@ import argparse
 from PIL import Image
 from PIL import ImageFont
 from PIL import ImageDraw
+import scipy.misc
 
 f = open('codec.txt', 'r', encoding='utf-8')
 codec = f.readlines()[0]
@@ -46,9 +49,25 @@ def resize_image(im, max_size = 1585152, scale_up=True):
   scaled = cv2.resize(im, dsize=(resize_w, resize_h))
   return scaled, (resize_h, resize_w)
 
+def valid_image_size(image_path, width):
+    number_component = image_path.split("_")[1].split(".")[0]
+    num = int(number_component)
+    return num == width
 
-if __name__ == '__main__':
+def valid_image_number(image_path, img_num):
+  #indexings: [-2:], [-1]
+  if img_num == -1:
+    return True 
+  try:
+      number_component = image_path.split("_")[-2][-2:]
+      num = int(number_component)
+      return num == img_num
+  except:
+    # print("invalid")
+    return False 
 
+def run_model(path, show_boxes=False):
+  predictions = {}
   parser = argparse.ArgumentParser()
   parser.add_argument('-cuda', type=int, default=1)
   parser.add_argument('-model', default='e2e-mlt.h5')
@@ -66,16 +85,17 @@ if __name__ == '__main__':
     print('Using cuda ...')
     net = net.cuda()
 
-  cap = cv2.VideoCapture(0)
-  cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
-  ret, im = cap.read()
-
+  image = os.listdir(path)
   frame_no = 0
   with torch.no_grad():
-    while ret:
-      ret, im = cap.read()
 
-      if ret==True:
+    for i in image:
+      if valid_image_number(path+i, 15):
+        im=Image.open(path + i)
+
+        im = im.convert('RGB')
+        im = np.asarray(im)
+        im = im[...,:3]
         im_resized, (ratio_h, ratio_w) = resize_image(im, scale_up=False)
         images = np.asarray([im_resized], dtype=np.float)
         images /= 128
@@ -103,6 +123,7 @@ if __name__ == '__main__':
         #  boxes = boxes[0:10]
 
         out_boxes = []
+        prediction_i = []
         for box in boxes:
 
           pts  = box[0:8]
@@ -116,15 +137,32 @@ if __name__ == '__main__':
           center =  [box[0], box[1]]
           draw.text((center[0], center[1]), det_text, fill = (0,255,0),font=font2)
           out_boxes.append(box)
-          print(det_text)
 
-        im = np.array(img)
-        for box in out_boxes:
-          pts  = box[0:8]
-          pts = pts.reshape(4, -1)
-          draw_box_points(im, pts, color=(0, 255, 0), thickness=1)
+          # det_text is one prediction
+          prediction_i.append(det_text)
+          
+        predictions[i] = prediction_i
 
-        cv2.imshow('img', im)
-        cv2.waitKey(10)
+        # show each image boxes and output in pop up window. 
+        show_image_with_boxes(img, out_boxes, show=show_boxes)
+
+  print(predictions)
+  return predictions
+
+def show_image_with_boxes(img, out_boxes, show=False):
+  if show:
+    im = np.array(img)
+    for box in out_boxes:
+      pts  = box[0:8]
+      pts = pts.reshape(4, -1)
+      draw_box_points(im, pts, color=(0, 255, 0), thickness=1)
+
+    cv2.imshow('img', im)
+    cv2.waitKey(1)
 
 
+if __name__ == '__main__':
+  warnings.filterwarnings("ignore")
+  path = '/home/dkhullar/ocr/img_quality_experiments_data/'
+  images = "all"
+  run_model(path, show_boxes = False)

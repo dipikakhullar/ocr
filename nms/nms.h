@@ -12,6 +12,7 @@ namespace nms {
 		float probs[4];
 		int x;
 		int y;
+		std::int32_t nr_polys;
 	};
 
 	float paths_area(const ClipperLib::Paths &ps) {
@@ -74,7 +75,7 @@ namespace nms {
 				probs[2] += p.probs[2];
 				probs[3] += p.probs[3];
 
-				nr_polys += 1;
+				nr_polys += p.nr_polys;
 			}
 
 			Polygon get() const {
@@ -98,6 +99,7 @@ namespace nms {
 				p.probs[1] = probs[1];
 				p.probs[2] = probs[2];
 				p.probs[3] = probs[3];
+				p.nr_polys = nr_polys;
 
 				return p;
 			}
