@@ -57,20 +57,97 @@ def valid_image_size(image_path, width):
 def valid_image_number(image_path, img_num):
   #indexings: [-2:], [-1]
   if img_num == -1:
-    return True 
+    return True
   try:
       number_component = image_path.split("_")[-2][-2:]
       num = int(number_component)
       return num == img_num
   except:
     # print("invalid")
-    return False 
+    return False
+
+def run_model_input_image(im, show_boxes=False):
+  predictions = {}
+  parser = argparse.ArgumentParser()
+  parser.add_argument('-cuda', type=int, default=1)
+  parser.add_argument('-model', default='e2e-mlt-rctw.h5')
+  parser.add_argument('-segm_thresh', default=0.5)
+
+  font2 = ImageFont.truetype("Arial-Unicode-Regular.ttf", 18)
+
+  args = parser.parse_args()
+
+  net = ModelResNetSep2(attention=True)
+  net_utils.load_net(args.model, net)
+  net = net.eval()
+
+  if args.cuda:
+    print('Using cuda ...')
+    net = net.cuda()
+
+  with torch.no_grad():
+    # im = Image.open(im)
+    # im = im.convert('RGB')
+    im = np.asarray(im)
+    im = im[...,:3]
+    im_resized, (ratio_h, ratio_w) = resize_image(im, scale_up=False)
+    images = np.asarray([im_resized], dtype=np.float)
+    images /= 128
+    images -= 1
+    im_data = net_utils.np_to_variable(images, is_cuda=args.cuda).permute(0, 3, 1, 2)
+    seg_pred, rboxs, angle_pred, features = net(im_data)
+
+    rbox = rboxs[0].data.cpu()[0].numpy()
+    rbox = rbox.swapaxes(0, 1)
+    rbox = rbox.swapaxes(1, 2)
+
+    angle_pred = angle_pred[0].data.cpu()[0].numpy()
+
+
+    segm = seg_pred[0].data.cpu()[0].numpy()
+    segm = segm.squeeze(0)
+
+    draw2 = np.copy(im_resized)
+    boxes =  get_boxes(segm, rbox, angle_pred, args.segm_thresh)
+
+    img = Image.fromarray(draw2)
+    draw = ImageDraw.Draw(img)
+
+    #if len(boxes) > 10:
+    #  boxes = boxes[0:10]
+
+    out_boxes = []
+    prediction_i = []
+    for box in boxes:
+
+        pts  = box[0:8]
+        pts = pts.reshape(4, -1)
+
+        det_text, conf, dec_s = ocr_image(net, codec, im_data, box)
+        if len(det_text) == 0:
+            continue
+
+        width, height = draw.textsize(det_text, font=font2)
+        center =  [box[0], box[1]]
+        draw.text((center[0], center[1]), det_text, fill = (0,255,0),font=font2)
+        out_boxes.append(box)
+
+        # det_text is one prediction
+        prediction_i.append(det_text)
+
+    predictions["frame"] = prediction_i
+
+    # show each image boxes and output in pop up window.
+    show_image_with_boxes(img, out_boxes, show=show_boxes)
+
+  print(predictions)
+  return predictions
 
 def run_model(path, show_boxes=False):
   predictions = {}
   parser = argparse.ArgumentParser()
   parser.add_argument('-cuda', type=int, default=1)
-  parser.add_argument('-model', default='e2e-mlt.h5')
+  parser.add_argument('-model', default='e2e-mlt-rctw.h5')
   parser.add_argument('-segm_thresh', default=0.5)
 
   font2 = ImageFont.truetype("Arial-Unicode-Regular.ttf", 18)
@@ -140,10 +217,10 @@ def run_model(path, show_boxes=False):
 
           # det_text is one prediction
           prediction_i.append(det_text)
-          
+
         predictions[i] = prediction_i
 
-        # show each image boxes and output in pop up window. 
+        # show each image boxes and output in pop up window.
         show_image_with_boxes(img, out_boxes, show=show_boxes)
 
   print(predictions)
@@ -163,6 +240,6 @@ def show_image_with_boxes(img, out_boxes, show=False):
 
 if __name__ == '__main__':
   warnings.filterwarnings("ignore")
-  path = '/home/dkhullar/ocr/img_quality_experiments_data/'
+  path = './img_quality_experiments_data/'
   images = "all"
   run_model(path, show_boxes = False)
