@@ -133,7 +133,7 @@ def run_model_input_image(im, show_boxes=False):
         out_boxes.append(box)
 
         # det_text is one prediction
-        prediction_i.append(det_text)
+        prediction_i.append(det_text.lower())
 
     predictions["frame"] = prediction_i
 

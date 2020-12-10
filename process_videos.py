@@ -45,4 +45,5 @@ if __name__ == '__main__':
   frames = extract_images(path, time)
   for f in frames:
       model_predictions = run_model_input_image(f)
-      featurize_model_outputs(model_predictions)
+      out = featurize_model_outputs(model_predictions)
+      print(out)
