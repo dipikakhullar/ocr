@@ -4,7 +4,7 @@ import argparse
 import cv2
 import scipy.misc
 from PIL import Image
-import numpy as np 
+import numpy as np
 from demo import resize_image, run_model_input_image
 
 
@@ -23,15 +23,16 @@ def extract_images(path, frequency):
     success,image = vidcap.read()
     # print(success)
     success = True
-    all_images = []
+    all_images = {}
     t = 0
     while success:
         vidcap.set(cv2.CAP_PROP_POS_MSEC,(count))
         success,image = vidcap.read()
-        cv2.imwrite("./temp/frame%d.jpg" % count, image)
+        cur_image = "./temp/frame" + str(count)+ ".jpg"
+        cv2.imwrite(cur_image, image)
         print ('Read a new frame: ', success)
         print(image.shape)
-        all_images.append(image)
+        all_images[cur_image]=image
         count += frequency
         t += 1
         if t == 10:
@@ -42,8 +43,8 @@ def extract_images(path, frequency):
 if __name__ == '__main__':
   path = './video_toy_data/maps_lyrics.mp4'
   time = 20000
-  frames = extract_images(path, time)
-  for f in frames:
-      model_predictions = run_model_input_image(f)
-      out = featurize_model_outputs(model_predictions)
+  frames = extract_images(path, time)  #dictionary with img_name:word_list
+  for keys,values in frames.items():
+      model_predictions = run_model_input_image(values)
+      out = featurize_model_outputs(model_predictions,keys)
       print(out)
